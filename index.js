@@ -55,6 +55,17 @@ async function run() {
       res.status(201).send(result);
     });
 
+// Get all news (Normal User)
+app.get('/news', async (req, res) => {
+  try {
+    const newsArticles = await newsCollection.find({}).toArray();
+    res.status(200).json(newsArticles);
+  } catch (error) {
+    console.error('Error fetching news:', error);
+    res.status(500).json({ message: 'Failed to fetch news' });
+  }
+});
+
     // Request to become a Reporter
     app.post('/request-reporter', async (req, res) => {
       const { email } = req.body; 
