@@ -1,23 +1,16 @@
-
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const dotenv = require('dotenv');
 
-
 dotenv.config();
 
-
 const app = express();
-
-
 app.use(cors());
-
-
 app.use(express.json());
 
 // MongoDB connection URI
-const uri = "mongodb+srv://globalNewsDB:C6xNVXITzE8d2YBX@cluster0.47zrhkq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.dizfzlf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with options for Stable API version
 const client = new MongoClient(uri, {
@@ -31,19 +24,18 @@ const client = new MongoClient(uri, {
 // Connect to MongoDB and set up the collections
 async function run() {
   try {
-    // Connect the client to the server
-    await client.connect();
-   
+    // Connect to MongoDB
+    //await client.connect();
 
-    //collections here
-    const db = client.db('globalNewsDB'); 
+    // Collections
+    const db = client.db('globalNewsDB');
     const usersCollection = db.collection('users');
     const newsCollection = db.collection('news');
 
     // User Registration
     app.post('/register', async (req, res) => {
-      const user = req.body; 
-      user.role = 'Normal User'; 
+      const user = req.body;
+      user.role = 'Normal User';
       user.status = 'Active';
 
       const existingUser = await usersCollection.findOne({ email: user.email });
@@ -55,20 +47,20 @@ async function run() {
       res.status(201).send(result);
     });
 
-// Get all news (Normal User)
-app.get('/news', async (req, res) => {
-  try {
-    const newsArticles = await newsCollection.find({}).toArray();
-    res.status(200).json(newsArticles);
-  } catch (error) {
-    console.error('Error fetching news:', error);
-    res.status(500).json({ message: 'Failed to fetch news' });
-  }
-});
+    // Get all news (Normal User)
+    app.get('/news', async (req, res) => {
+      try {
+        const newsArticles = await newsCollection.find({}).toArray();
+        res.status(200).json(newsArticles);
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        res.status(500).json({ message: 'Failed to fetch news' });
+      }
+    });
 
     // Request to become a Reporter
     app.post('/request-reporter', async (req, res) => {
-      const { email } = req.body; 
+      const { email } = req.body;
       const result = await usersCollection.updateOne(
         { email },
         { $set: { status: 'Requested' } }
@@ -79,7 +71,7 @@ app.get('/news', async (req, res) => {
 
     // Admin approves or cancels request
     app.patch('/admin/approve-request', async (req, res) => {
-      const { email, action } = req.body; 
+      const { email, action } = req.body;
       if (action === 'approve') {
         const result = await usersCollection.updateOne(
           { email },
@@ -116,7 +108,7 @@ app.get('/news', async (req, res) => {
 
     // Create News (Reporter)
     app.post('/news', async (req, res) => {
-      const newsArticle = req.body; 
+      const newsArticle = req.body;
       const result = await newsCollection.insertOne(newsArticle);
       res.status(201).send(result);
     });
@@ -132,7 +124,7 @@ app.get('/news', async (req, res) => {
     app.patch('/news/:id', async (req, res) => {
       const { id } = req.params;
       const { action, updatedArticle } = req.body;
-      
+
       if (action === 'delete') {
         const result = await newsCollection.deleteOne({ _id: id });
         return res.send(result);
@@ -152,7 +144,7 @@ app.get('/news', async (req, res) => {
       const { email, newsId } = req.body;
       const result = await usersCollection.updateOne(
         { email },
-        { $addToSet: { bookmarks: newsId } } 
+        { $addToSet: { bookmarks: newsId } }
       );
       res.send(result);
     });
@@ -169,21 +161,23 @@ app.get('/news', async (req, res) => {
       res.send(user.bookmarks);
     });
 
+    // Ping MongoDB to confirm connection
+    await client.db("admin").command({ ping: 1 });
+    console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
   }
 }
 
-
- // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-
-// Start the server
-const PORT = process.env.PORT || 3000;
+// Start the server on port 3001
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
 // Connect to MongoDB
 run().catch(console.dir);
+
+app.get("/", (req, res) => {
+  res.send("global news server is running....");
+});
