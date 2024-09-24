@@ -1,7 +1,7 @@
-const express = require("express");
-const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
-const dotenv = require("dotenv");
+const express = require('express');
+const cors = require('cors');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const dotenv = require('dotenv');
 
 dotenv.config();
 
@@ -163,6 +163,29 @@ async function run() {
       res.send(user.bookmarks);
     });
 
+    // for news details page-------
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+    
+      // Check if id is a valid MongoDB ObjectId
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid news ID' });
+      }
+    
+      try {
+        // Convert the id to an ObjectId
+        const newsItem = await newsCollection.findOne({ _id: new ObjectId(id) });
+    
+        if (newsItem) {
+          res.json(newsItem);
+        } else {
+          res.status(404).send({ message: 'News not found' });
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        res.status(500).send({ message: 'Internal Server Error', error });
+      }
+    });
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
     console.log(
