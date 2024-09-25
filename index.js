@@ -23,7 +23,7 @@ const io = new Server(server, {
 // CORS configuration for Express
 app.use(cors({
   origin: 'http://localhost:3000', // Client URL
-  methods: ['GET', 'POST'], // Allowed methods
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Allowed methods
   allowedHeaders: ['Content-Type'], // Allowed headers
 }));
 
@@ -243,6 +243,54 @@ async function run() {
 
       res.send(user.bookmarks);
     });
+
+// Find admin----------------------------
+app.get("/users/admin/:email", async (req, res) => {
+  const email = req.params.email;
+  console.log("Fetching admin status for:", email); // Log the email
+  
+  const query = { email: email };
+  const user = await usersCollection.findOne(query);
+  
+  if (!user) {
+    console.log("User not found"); // Log when user is not found
+    return res.status(404).send({ message: "User not found" });
+  }
+
+  const admin = user?.role === "admin";
+  res.send({ admin });
+});
+
+
+// Get all users
+app.get("/users", async (req, res) => {
+  try {
+    const users = await usersCollection.find().toArray(); // fetch all users
+    res.send(users);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch users" });
+  }
+});
+
+// delete user for admin dashboard----------------
+app.delete("/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await usersCollection.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(result);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).send({ message: "Failed to delete user" });
+  }
+});
+
+
+
+
 
     // for news details page-------
     app.get('/news/:id', async (req, res) => {
