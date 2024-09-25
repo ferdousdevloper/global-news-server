@@ -1,13 +1,51 @@
-const express = require('express');
-const cors = require('cors');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const dotenv = require('dotenv');
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ServerApiVersion } = require("mongodb");
+const dotenv = require("dotenv");
+const { Server } = require("socket.io");
+const nodemailer = require("nodemailer");
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// send email
+const sendEmail = (emailAddress, emailData) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.TRANSPORTER_EMAIL,
+      pass: process.env.TRANSPORTER_PASS,
+    },
+  });
+  // verify connection
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Server is ready to take our messages");
+    }
+  });
+  const mailBody = {
+    from: `"GlobalNews" <${process.env.TRANSPORTER_EMAIL}>`,
+    to: emailAddress,
+    subject: emailData.subject,
+    html: emailData.message,
+  };
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Email Sent: " + info.response);
+    }
+  });
+};
 
 // MongoDB connection URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.dizfzlf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -44,6 +82,12 @@ async function run() {
       }
 
       const result = await usersCollection.insertOne(user);
+
+      // welcome message to email
+      sendEmail(user?.email, {
+        subject: "Welcome to the Global News website!",
+        message: `Hope you will find a lot of resources which you find`,
+      });
       res.status(201).send(result);
     });
 
@@ -163,29 +207,6 @@ async function run() {
       res.send(user.bookmarks);
     });
 
-    // for news details page-------
-    app.get('/news/:id', async (req, res) => {
-      const { id } = req.params;
-    
-      // Check if id is a valid MongoDB ObjectId
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid news ID' });
-      }
-    
-      try {
-        // Convert the id to an ObjectId
-        const newsItem = await newsCollection.findOne({ _id: new ObjectId(id) });
-    
-        if (newsItem) {
-          res.json(newsItem);
-        } else {
-          res.status(404).send({ message: 'News not found' });
-        }
-      } catch (error) {
-        console.error('Error fetching news:', error);
-        res.status(500).send({ message: 'Internal Server Error', error });
-      }
-    });
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
     console.log(
