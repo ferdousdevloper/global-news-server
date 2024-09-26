@@ -345,7 +345,32 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
+//block normal user ----------------
+app.patch("/users/block/:id",  async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      status: "block",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
 
+
+// active blocked user
+app.patch("/users/active/:id", async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      status: "active",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
 
 
 
