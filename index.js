@@ -1,16 +1,33 @@
-const express = require("express");
-const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
-const dotenv = require("dotenv");
-const { Server } = require("socket.io");
+const express = require('express');
+const cors = require('cors');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const dotenv = require('dotenv');
+const http = require('http');
+const { Server } = require('socket.io');
 const nodemailer = require("nodemailer");
-
 dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const server = http.createServer(app);
 
+// CORS configuration for Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000", // Your frontend URL
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"],
+    credentials: true
+  }
+});
+
+// CORS configuration for Express
+app.use(cors({
+  origin: 'http://localhost:3000', // Client URL
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Allowed methods
+  allowedHeaders: ['Content-Type'], // Allowed headers
+}));
+
+app.use(express.json());
 // send email
 const sendEmail = (emailAddress, emailData) => {
   const transporter = nodemailer.createTransport({
@@ -70,6 +87,54 @@ async function run() {
     const usersCollection = db.collection("users");
     const newsCollection = db.collection("news");
 
+    // Socket.IO connection
+    io.on('connection', (socket) => {
+      console.log('New client connected');
+
+      // Send live news to the newly connected client
+      const sendNewsToClient = async () => {
+        try {
+          const news = await newsCollection.find({ isLive: true }).sort({ timestamp: -1 }).toArray();
+          socket.emit('liveNews', news);
+        } catch (error) {
+          console.error('Error fetching news:', error);
+        }
+      };
+
+      sendNewsToClient();
+
+      // Listen for new news posted
+      socket.on('newNews', async (newsArticle) => {
+        try {
+          await newsCollection.insertOne(newsArticle);
+          io.emit('newsPosted', newsArticle); // Broadcast new article to all clients
+        } catch (error) {
+          console.error('Error posting news:', error);
+        }
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Client disconnected');
+      });
+    });
+
+    // API route to post news
+    app.post('/news', async (req, res) => {
+      const newsArticle = {
+        ...req.body,
+        timestamp: new Date(),
+      };
+
+      try {
+        const result = await newsCollection.insertOne(newsArticle);
+        io.emit('newsPosted', newsArticle); // Broadcast to all clients
+        res.status(201).json(result);
+      } catch (error) {
+        console.error('Error posting news:', error);
+        res.status(500).json({ message: 'Failed to post news' });
+      }
+    });
+
     // User Registration
     app.post("/register", async (req, res) => {
       const user = req.body;
@@ -91,14 +156,35 @@ async function run() {
       res.status(201).send(result);
     });
 
-    // Get all news (Normal User)
-    app.get("/news", async (req, res) => {
+    // API route to get all news with optional filtering
+    app.get('/news', async (req, res) => {
       try {
-        const newsArticles = await newsCollection.find({}).toArray();
-        res.status(200).json(newsArticles);
+        const { category, region, date } = req.query;
+        let filter = {};
+
+        if (category && category !== 'All') {
+          filter.category = category;
+        }
+        if (region && region !== 'All') {
+          filter.region = region;
+        }
+        if (date) {
+          const now = new Date();
+          if (date === 'today') {
+            filter.timestamp = { $gte: new Date(now.setHours(0, 0, 0)), $lt: new Date(now.setHours(23, 59, 59)) };
+          } else if (date === 'this_week') {
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+            filter.timestamp = { $gte: startOfWeek, $lte: now };
+          } else if (date === 'this_month') {
+            filter.timestamp = { $gte: new Date(now.getFullYear(), now.getMonth(), 1), $lte: now };
+          }
+        }
+
+        const news = await newsCollection.find(filter).sort({ timestamp: -1 }).toArray();
+        res.status(200).json(news);
       } catch (error) {
-        console.error("Error fetching news:", error);
-        res.status(500).json({ message: "Failed to fetch news" });
+        res.status(500).json({ message: 'Error fetching news', error });
       }
     });
 
@@ -152,13 +238,6 @@ async function run() {
       res.status(400).json({ message: "Invalid action" });
     });
 
-    // Create News (Reporter)
-    app.post("/news", async (req, res) => {
-      const newsArticle = req.body;
-      const result = await newsCollection.insertOne(newsArticle);
-      res.status(201).send(result);
-    });
-
     // Get My Articles (Reporter)
     app.get("/my-articles/:email", async (req, res) => {
       const email = req.params.email;
@@ -207,6 +286,77 @@ async function run() {
       res.send(user.bookmarks);
     });
 
+// Find admin----------------------------
+app.get("/users/admin/:email", async (req, res) => {
+  const email = req.params.email;
+  console.log("Fetching admin status for:", email); // Log the email
+  
+  const query = { email: email };
+  const user = await usersCollection.findOne(query);
+  
+  if (!user) {
+    console.log("User not found"); // Log when user is not found
+    return res.status(404).send({ message: "User not found" });
+  }
+
+  const admin = user?.role === "admin";
+  res.send({ admin });
+});
+
+
+// Get all users
+app.get("/users", async (req, res) => {
+  try {
+    const users = await usersCollection.find().toArray(); // fetch all users
+    res.send(users);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch users" });
+  }
+});
+
+// delete user for admin dashboard----------------
+app.delete("/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await usersCollection.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(result);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).send({ message: "Failed to delete user" });
+  }
+});
+
+
+
+
+
+    // for news details page-------
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+    
+      // Check if id is a valid MongoDB ObjectId
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid news ID' });
+      }
+    
+      try {
+        // Convert the id to an ObjectId
+        const newsItem = await newsCollection.findOne({ _id: new ObjectId(id) });
+    
+        if (newsItem) {
+          res.json(newsItem);
+        } else {
+          res.status(404).send({ message: 'News not found' });
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        res.status(500).send({ message: 'Internal Server Error', error });
+      }
+    });
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -219,7 +369,7 @@ async function run() {
 
 // Start the server on port 3001
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
@@ -227,5 +377,5 @@ app.listen(PORT, () => {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("global news server is running....");
+  res.send("Global news server is running...");
 });
