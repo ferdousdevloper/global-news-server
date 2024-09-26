@@ -44,7 +44,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect to MongoDB
-    //await client.connect();
+    await client.connect();
 
     // Collections
     const db = client.db('globalNewsDB');
@@ -55,11 +55,13 @@ async function run() {
     io.on('connection', (socket) => {
       console.log('New client connected');
 
-      // Send live news to the newly connected client
+      // Send latest live news to the newly connected client
       const sendNewsToClient = async () => {
         try {
-          const news = await newsCollection.find({ isLive: true }).sort({ timestamp: -1 }).toArray();
-          socket.emit('liveNews', news);
+          const news = await newsCollection.find({ isLive: true }).sort({ timestamp: -1 }).limit(1).toArray();
+          if (news.length > 0) {
+            socket.emit('liveNews', news); // Emit only the latest live news
+          }
         } catch (error) {
           console.error('Error fetching news:', error);
         }
@@ -72,6 +74,10 @@ async function run() {
         try {
           await newsCollection.insertOne(newsArticle);
           io.emit('newsPosted', newsArticle); // Broadcast new article to all clients
+          // Emit the new live article to all clients if it's live
+          if (newsArticle.isLive) {
+            io.emit('liveNews', [newsArticle]); // Send the new live article
+          }
         } catch (error) {
           console.error('Error posting news:', error);
         }
@@ -92,6 +98,10 @@ async function run() {
       try {
         const result = await newsCollection.insertOne(newsArticle);
         io.emit('newsPosted', newsArticle); // Broadcast to all clients
+        // Emit the new live article if it's live
+        if (newsArticle.isLive) {
+          io.emit('liveNews', [newsArticle]);
+        }
         res.status(201).json(result);
       } catch (error) {
         console.error('Error posting news:', error);
