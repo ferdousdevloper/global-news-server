@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000", // Your frontend URL
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type"],
     credentials: true
   }
@@ -312,6 +312,21 @@ app.get("/users", async (req, res) => {
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch users" });
   }
+});
+
+
+// Make normal user to admin for admin dashboard----------------
+
+app.patch("/users/admin/:id", async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      role: "admin",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
 });
 
 // delete user for admin dashboard----------------
