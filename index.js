@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
-
+const nodemailer = require("nodemailer");
 dotenv.config();
 
 const app = express();
@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000", // Your frontend URL
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type"],
     credentials: true
   }
@@ -23,11 +23,47 @@ const io = new Server(server, {
 // CORS configuration for Express
 app.use(cors({
   origin: 'http://localhost:3000', // Client URL
-  methods: ['GET', 'POST'], // Allowed methods
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Allowed methods
   allowedHeaders: ['Content-Type'], // Allowed headers
 }));
 
 app.use(express.json());
+// send email
+const sendEmail = (emailAddress, emailData) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.TRANSPORTER_EMAIL,
+      pass: process.env.TRANSPORTER_PASS,
+    },
+  });
+  // verify connection
+  transporter.verify(function (error, success) {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Server is ready to take our messages");
+    }
+  });
+  const mailBody = {
+    from: `"GlobalNews" <${process.env.TRANSPORTER_EMAIL}>`,
+    to: emailAddress,
+    subject: emailData.subject,
+    html: emailData.message,
+  };
+
+  transporter.sendMail(mailBody, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Email Sent: " + info.response);
+    }
+  });
+};
+
 // MongoDB connection URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.dizfzlf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -37,7 +73,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 // Connect to MongoDB and set up the collections
@@ -47,9 +83,9 @@ async function run() {
     await client.connect();
 
     // Collections
-    const db = client.db('globalNewsDB');
-    const usersCollection = db.collection('users');
-    const newsCollection = db.collection('news');
+    const db = client.db("globalNewsDB");
+    const usersCollection = db.collection("users");
+    const newsCollection = db.collection("news");
 
     // Socket.IO connection
     io.on('connection', (socket) => {
@@ -110,17 +146,23 @@ async function run() {
     });
 
     // User Registration
-    app.post('/register', async (req, res) => {
+    app.post("/register", async (req, res) => {
       const user = req.body;
-      user.role = 'Normal User';
-      user.status = 'Active';
+      user.role = "Normal User";
+      user.status = "Active";
 
       const existingUser = await usersCollection.findOne({ email: user.email });
       if (existingUser) {
-        return res.status(400).json({ message: 'User already exists' });
+        return res.status(400).json({ message: "User already exists" });
       }
 
       const result = await usersCollection.insertOne(user);
+
+      // welcome message to email
+      sendEmail(user?.email, {
+        subject: "Welcome to the Global News website!",
+        message: `Hope you will find a lot of resources which you find`,
+      });
       res.status(201).send(result);
     });
 
@@ -156,44 +198,46 @@ async function run() {
       }
     });
 
+    // get specific news
+
     // Request to become a Reporter
-    app.post('/request-reporter', async (req, res) => {
+    app.post("/request-reporter", async (req, res) => {
       const { email } = req.body;
       const result = await usersCollection.updateOne(
         { email },
-        { $set: { status: 'Requested' } }
+        { $set: { status: "Requested" } }
       );
 
       res.send(result);
     });
 
     // Admin approves or cancels request
-    app.patch('/admin/approve-request', async (req, res) => {
+    app.patch("/admin/approve-request", async (req, res) => {
       const { email, action } = req.body;
-      if (action === 'approve') {
+      if (action === "approve") {
         const result = await usersCollection.updateOne(
           { email },
-          { $set: { role: 'Reporter', status: 'Approved' } }
+          { $set: { role: "Reporter", status: "Approved" } }
         );
         return res.send(result);
-      } else if (action === 'cancel') {
+      } else if (action === "cancel") {
         const result = await usersCollection.updateOne(
           { email },
-          { $set: { status: 'Denied' } }
+          { $set: { status: "Denied" } }
         );
         return res.send(result);
       }
 
-      res.status(400).json({ message: 'Invalid action' });
+      res.status(400).json({ message: "Invalid action" });
     });
 
     // Manage Users (Admin)
-    app.put('/admin/manage-user', async (req, res) => {
+    app.put("/admin/manage-user", async (req, res) => {
       const { email, action, updatedUser } = req.body;
-      if (action === 'delete') {
+      if (action === "delete") {
         const result = await usersCollection.deleteOne({ email });
         return res.send(result);
-      } else if (action === 'edit') {
+      } else if (action === "edit") {
         const result = await usersCollection.updateOne(
           { email },
           { $set: updatedUser }
@@ -201,25 +245,25 @@ async function run() {
         return res.send(result);
       }
 
-      res.status(400).json({ message: 'Invalid action' });
+      res.status(400).json({ message: "Invalid action" });
     });
 
     // Get My Articles (Reporter)
-    app.get('/my-articles/:email', async (req, res) => {
+    app.get("/my-articles/:email", async (req, res) => {
       const email = req.params.email;
       const articles = await newsCollection.find({ author: email }).toArray();
       res.send(articles);
     });
 
     // Edit or Delete My Articles (Reporter)
-    app.patch('/news/:id', async (req, res) => {
+    app.patch("/news/:id", async (req, res) => {
       const { id } = req.params;
       const { action, updatedArticle } = req.body;
 
-      if (action === 'delete') {
+      if (action === "delete") {
         const result = await newsCollection.deleteOne({ _id: id });
         return res.send(result);
-      } else if (action === 'edit') {
+      } else if (action === "edit") {
         const result = await newsCollection.updateOne(
           { _id: id },
           { $set: updatedArticle }
@@ -227,11 +271,11 @@ async function run() {
         return res.send(result);
       }
 
-      res.status(400).json({ message: 'Invalid action' });
+      res.status(400).json({ message: "Invalid action" });
     });
 
     // Bookmark News (Normal User)
-    app.post('/bookmark', async (req, res) => {
+    app.post("/bookmark", async (req, res) => {
       const { email, newsId } = req.body;
       const result = await usersCollection.updateOne(
         { email },
@@ -241,20 +285,133 @@ async function run() {
     });
 
     // Get Bookmarked News (Normal User)
-    app.get('/bookmarks/:email', async (req, res) => {
+    app.get("/bookmarks/:email", async (req, res) => {
       const email = req.params.email;
       const user = await usersCollection.findOne({ email });
 
       if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+        return res.status(404).json({ message: "User not found" });
       }
 
       res.send(user.bookmarks);
     });
 
+// Find admin----------------------------
+app.get("/users/admin/:email", async (req, res) => {
+  const email = req.params.email;
+  console.log("Fetching admin status for:", email); // Log the email
+  
+  const query = { email: email };
+  const user = await usersCollection.findOne(query);
+  
+  if (!user) {
+    console.log("User not found"); // Log when user is not found
+    return res.status(404).send({ message: "User not found" });
+  }
+
+  const admin = user?.role === "admin";
+  res.send({ admin });
+});
+
+
+// Get all users
+app.get("/users", async (req, res) => {
+  try {
+    const users = await usersCollection.find().toArray(); // fetch all users
+    res.send(users);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch users" });
+  }
+});
+
+
+// Make normal user to admin for admin dashboard----------------
+
+app.patch("/users/admin/:id", async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      role: "admin",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
+
+// delete user for admin dashboard----------------
+app.delete("/users/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await usersCollection.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(result);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).send({ message: "Failed to delete user" });
+  }
+});
+
+//block normal user ----------------
+app.patch("/users/block/:id",  async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      status: "block",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
+
+
+// active blocked user
+app.patch("/users/active/:id", async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const updatedDoc = {
+    $set: {
+      status: "active",
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updatedDoc);
+  res.send(result);
+});
+
+
+
+    // for news details page-------
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+    
+      // Check if id is a valid MongoDB ObjectId
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid news ID' });
+      }
+    
+      try {
+        // Convert the id to an ObjectId
+        const newsItem = await newsCollection.findOne({ _id: new ObjectId(id) });
+    
+        if (newsItem) {
+          res.json(newsItem);
+        } else {
+          res.status(404).send({ message: 'News not found' });
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        res.status(500).send({ message: 'Internal Server Error', error });
+      }
+    });
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
   }
