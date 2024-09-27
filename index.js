@@ -397,6 +397,99 @@ app.patch("/users/active/:id", async (req, res) => {
         res.status(500).send({ message: 'Internal Server Error', error });
       }
     });
+
+// DASHBOARD  Fetch all news--------------
+app.get('/news', async (req, res) => {
+  try {
+    const news = await newsCollection.find().toArray();
+    res.json(news);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// DASHBOARD Update news-----------------
+app.put('/news/:id', async (req, res) => {
+  const id = req.params.id;
+  const updatedData = req.body;
+  try {
+    const result = await newsCollection.updateOne({ _id: ObjectId(id) }, { $set: updatedData });
+    res.json(result);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// DASHBOARD Delete news------------------
+app.delete("/news/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await newsCollection.deleteOne(query);
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(result);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).send({ message: "Failed to delete user" });
+  }
+});
+
+
+
+
+// // Update news item
+// // Update news item
+// app.put("/news/:id", async (req, res) => {
+//   const id = req.params.id;
+
+//   // Validate the ObjectId format
+//   if (!ObjectId.isValid(id)) {
+//     return res.status(400).send("Invalid Object ID format");
+//   }
+
+//   const updateData = req.body;
+//   const filter = { _id: new ObjectId(id) };
+
+//   try {
+//     console.log("Updating news item:", updateData);
+
+//     const result = await newsCollection.updateOne(filter, {
+//       $set: {
+//         image: updateData.image,
+//         title: updateData.title,
+//         category: updateData.category,
+//         region: updateData.region,
+//         description: updateData.description,
+//         date_time: updateData.date_time,
+//         breaking_news: updateData.breaking_news,
+//         popular_news: updateData.popular_news,
+//       },
+//     });
+
+//     if (result.matchedCount === 0) {
+//       return res.status(404).send("News item not found");
+//     }
+
+//     if (result.modifiedCount === 0) {
+//       return res.status(400).send("No changes were made");
+//     }
+
+//     res.status(200).send("News item updated successfully");
+//   } catch (error) {
+//     console.error("Error updating news:", error);
+//     res.status(500).send("Error updating news: " + error.message);
+//   }
+// });
+
+
+
+
+
+
+
+
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
     console.log(
