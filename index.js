@@ -13,7 +13,7 @@ const server = http.createServer(app);
 // CORS configuration for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Your frontend URL
+    origin: "https://illustrious-melomakarona-23aba4.netlify.app", // Your frontend URL
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type"],
     credentials: true
@@ -22,7 +22,7 @@ const io = new Server(server, {
 
 // CORS configuration for Express
 app.use(cors({
-  origin: 'http://localhost:3000', // Client URL
+  origin: 'https://illustrious-melomakarona-23aba4.netlify.app', // Client URL
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], // Allowed methods
   allowedHeaders: ['Content-Type'], // Allowed headers
 }));
@@ -80,7 +80,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect to MongoDB
-    await client.connect();
+    // await client.connect();
 
     // Collections
     const db = client.db("globalNewsDB");
@@ -211,6 +211,23 @@ async function run() {
       res.send(result);
     });
 
+// Route to fetch pending reporter requests
+app.get("/pending-reporter-requests", async (req, res) => {
+  try {
+    // Query to find users with role "Normal User" and status "Requested"
+    const pendingRequests = await usersCollection
+      .find({ role: "Normal User", status: "Requested" })
+      .toArray();
+
+    // Send the list of pending requests as JSON
+    res.status(200).json(pendingRequests);
+  } catch (error) {
+    console.error("Error fetching pending reporter requests:", error);
+    res.status(500).json({ message: "Failed to fetch pending requests." });
+  }
+});
+
+
     // Admin approves or cancels request
     app.patch("/admin/approve-request", async (req, res) => {
       const { email, action } = req.body;
@@ -227,7 +244,6 @@ async function run() {
         );
         return res.send(result);
       }
-
       res.status(400).json({ message: "Invalid action" });
     });
 
@@ -324,6 +340,22 @@ app.get("/users", async (req, res) => {
   }
 });
 
+// Get user by email
+app.get('/user/:email', async (req, res) => {
+  try {
+    const email = req.params.email; // Get the email from the URL
+    const user = await usersCollection.findOne({ email }); // Query the usersCollection by email
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' }); // If user is not found
+    }
+
+    res.status(200).json(user); // Send back the user data if found
+  } catch (error) {
+    console.error('Error fetching user by email:', error);
+    res.status(500).json({ message: 'Error fetching user data' }); // Handle errors
+  }
+});
 
 // Make normal user to admin for admin dashboard----------------
 
