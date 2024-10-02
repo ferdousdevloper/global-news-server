@@ -576,49 +576,60 @@ app.patch('/news/edit-article/:id', async (req, res) => {
       }
     });
 
+    // Get a single news article by ID
+app.get('/news/:id', async (req, res) => {
+  const newsId = req.params.id; 
+  const newsArticle = await newsCollection.findOne({ _id: ObjectId(newsId) }); // Fetch the article from the database
+  
+  if (!newsArticle) {
+    return res.status(404).json({ message: 'News article not found' }); }
+
+  res.json(newsArticle); 
+});
+
+
     // // Update news item
-    // // Update news item
-    // app.put("/news/:id", async (req, res) => {
-    //   const id = req.params.id;
+    app.put("/news/:id", async (req, res) => {
+      const id = req.params.id;
 
     //   // Validate the ObjectId format
-    //   if (!ObjectId.isValid(id)) {
-    //     return res.status(400).send("Invalid Object ID format");
-    //   }
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send("Invalid Object ID format");
+      }
 
-    //   const updateData = req.body;
-    //   const filter = { _id: new ObjectId(id) };
+      const updateData = req.body;
+      const filter = { _id: new ObjectId(id) };
 
-    //   try {
-    //     console.log("Updating news item:", updateData);
+      try {
+        console.log("Updating news item:", updateData);
 
-    //     const result = await newsCollection.updateOne(filter, {
-    //       $set: {
-    //         image: updateData.image,
-    //         title: updateData.title,
-    //         category: updateData.category,
-    //         region: updateData.region,
-    //         description: updateData.description,
-    //         date_time: updateData.date_time,
-    //         breaking_news: updateData.breaking_news,
-    //         popular_news: updateData.popular_news,
-    //       },
-    //     });
+        const result = await newsCollection.updateOne(filter, {
+          $set: {
+            image: updateData.image,
+            title: updateData.title,
+            category: updateData.category,
+            region: updateData.region,
+            description: updateData.description,
+            date_time: updateData.date_time,
+            breaking_news: updateData.breaking_news,
+            popular_news: updateData.popular_news,
+          },
+        });
 
-    //     if (result.matchedCount === 0) {
-    //       return res.status(404).send("News item not found");
-    //     }
+        if (result.matchedCount === 0) {
+          return res.status(404).send("News item not found");
+        }
 
-    //     if (result.modifiedCount === 0) {
-    //       return res.status(400).send("No changes were made");
-    //     }
+        if (result.modifiedCount === 0) {
+          return res.status(400).send("No changes were made");
+        }
 
-    //     res.status(200).send("News item updated successfully");
-    //   } catch (error) {
-    //     console.error("Error updating news:", error);
-    //     res.status(500).send("Error updating news: " + error.message);
-    //   }
-    // });
+        res.status(200).send("News item updated successfully");
+      } catch (error) {
+        console.error("Error updating news:", error);
+        res.status(500).send("Error updating news: " + error.message);
+      }
+    });
 
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
