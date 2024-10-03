@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -13,7 +13,7 @@ const server = http.createServer(app);
 // CORS configuration for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000","https://global-news-server-five.vercel.app"], // Your frontend URL
+    origin: ["http://localhost:3000", "https://global-news-server-five.vercel.app"], // Your frontend URL
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"],
     credentials: true
@@ -241,6 +241,27 @@ async function run() {
 
       res.send(user.bookmarks);
     });
+
+    // get popular news
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+      console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await newsCollection.findOne(query);
+      res.send(result)
+    })
+
+    // get latest news
+    app.get('/newss/latestNews', async (req, res) => {
+      try {
+        const allNews = await newsCollection.find({}).sort({ timestamp: -1 }).limit(7).toArray();
+        res.send(allNews);
+      } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch latest news', error });
+      }
+    });
+
+
 
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
