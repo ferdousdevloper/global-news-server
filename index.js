@@ -13,7 +13,12 @@ const server = http.createServer(app);
 // CORS configuration for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Your frontend URL
+    origin: [
+      "http://localhost:3000",
+      "https://global-news-client.vercel.app",
+      "https://global-news-gama.netlify.app",
+      "https://illustrious-melomakarona-23aba4.netlify.app",
+    ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type"],
     credentials: true,
@@ -23,7 +28,12 @@ const io = new Server(server, {
 // CORS configuration for Express
 app.use(
   cors({
-    origin: "http://localhost:3000", // Client URL
+    origin: [
+      "http://localhost:3000",
+      "https://global-news-client.vercel.app",
+      "https://global-news-gama.netlify.app",
+      "https://illustrious-melomakarona-23aba4.netlify.app",
+    ], // Client URL
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"], // Allowed methods
     allowedHeaders: ["Content-Type"], // Allowed headers
   })
