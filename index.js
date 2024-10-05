@@ -184,6 +184,8 @@ async function run() {
 
     // API route to get all news with optional filtering
     app.get("/news", async (req, res) => {
+      const pages = parseInt(req.query.pages);
+      const size = parseInt(req.query.size);
       try {
         const { category, region, date } = req.query;
         let filter = {};
@@ -216,6 +218,8 @@ async function run() {
         const news = await newsCollection
           .find(filter)
           .sort({ timestamp: -1 })
+          .skip(pages * size)
+          .limit(size)
           .toArray();
         res.status(200).json(news);
       } catch (error) {
@@ -289,84 +293,11 @@ async function run() {
     });
 
     // Get My Articles (Reporter)
-    app.get("/news/my-articles/:email", async (req, res) => {
+    app.get("/my-articles/:email", async (req, res) => {
       const email = req.params.email;
       const articles = await newsCollection.find({ author: email }).toArray();
       res.send(articles);
     });
-
-    // Delete Article by ID route
-    app.delete("/news/delete-article/:id", async (req, res) => {
-      const articleId = req.params.id;
-
-      try {
-        const result = await newsCollection.deleteOne({
-          _id: new ObjectId(articleId),
-        });
-
-        if (result.deletedCount === 1) {
-          res.status(200).json({ message: "Article successfully deleted" });
-        } else {
-          res.status(404).json({ message: "Article not found" });
-        }
-      } catch (error) {
-        console.error("Error deleting article:", error);
-        res
-          .status(500)
-          .json({ message: "An error occurred while deleting the article" });
-      }
-    });
-
-
-   // Get article by ID route using GET
-   app.get('/news/get-article/:id', async (req, res) => {
-    try {
-      const articleId = req.params.id; // Get the article ID from the request parameters
-
-      // Validate the article ID
-      if (!ObjectId.isValid(articleId)) {
-        return res.status(400).json({ message: 'Invalid article ID format' });
-      }
-
-      const article = await newsCollection.findOne({ _id: new ObjectId(articleId) });
-
-      if (!article) {
-        return res.status(404).json({ message: 'Article not found' });
-      }
-
-      res.status(200).json(article); // Return the article data
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  });
-
-// Edit Article by ID route using PATCH
-app.patch('/news/edit-article/:id', async (req, res) => {
-  const articleId = req.params.id;
-  const { title, content, image } = req.body; // Assuming these are the fields you want to update
-
-  const updateData = {};
-  if (title) updateData.title = title;
-  if (content) updateData.content = content;
-  if (image) updateData.image = image;
-
-  try {
-    const result = await newsCollection.updateOne(
-      { _id: new ObjectId(articleId) },
-      { $set: updateData } // Update only the provided fields
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: 'Article not found' });
-    }
-
-    res.status(200).json({ message: 'Article successfully updated' });
-  } catch (error) {
-    console.error('Error updating article:', error);
-    res.status(500).json({ message: 'An error occurred while updating the article' });
-  }
-});
 
     // Edit or Delete My Articles (Reporter)
     app.patch("/news/:id", async (req, res) => {
@@ -587,60 +518,49 @@ app.get("/bookmarks/:email", async (req, res) => {
       }
     });
 
-    // Get a single news article by ID
-app.get('/news/:id', async (req, res) => {
-  const newsId = req.params.id; 
-  const newsArticle = await newsCollection.findOne({ _id: ObjectId(newsId) }); // Fetch the article from the database
-  
-  if (!newsArticle) {
-    return res.status(404).json({ message: 'News article not found' }); }
-
-  res.json(newsArticle); 
-});
-
-
     // // Update news item
-    app.put("/news/:id", async (req, res) => {
-      const id = req.params.id;
+    // // Update news item
+    // app.put("/news/:id", async (req, res) => {
+    //   const id = req.params.id;
 
     //   // Validate the ObjectId format
-      if (!ObjectId.isValid(id)) {
-        return res.status(400).send("Invalid Object ID format");
-      }
+    //   if (!ObjectId.isValid(id)) {
+    //     return res.status(400).send("Invalid Object ID format");
+    //   }
 
-      const updateData = req.body;
-      const filter = { _id: new ObjectId(id) };
+    //   const updateData = req.body;
+    //   const filter = { _id: new ObjectId(id) };
 
-      try {
-        console.log("Updating news item:", updateData);
+    //   try {
+    //     console.log("Updating news item:", updateData);
 
-        const result = await newsCollection.updateOne(filter, {
-          $set: {
-            image: updateData.image,
-            title: updateData.title,
-            category: updateData.category,
-            region: updateData.region,
-            description: updateData.description,
-            date_time: updateData.date_time,
-            breaking_news: updateData.breaking_news,
-            popular_news: updateData.popular_news,
-          },
-        });
+    //     const result = await newsCollection.updateOne(filter, {
+    //       $set: {
+    //         image: updateData.image,
+    //         title: updateData.title,
+    //         category: updateData.category,
+    //         region: updateData.region,
+    //         description: updateData.description,
+    //         date_time: updateData.date_time,
+    //         breaking_news: updateData.breaking_news,
+    //         popular_news: updateData.popular_news,
+    //       },
+    //     });
 
-        if (result.matchedCount === 0) {
-          return res.status(404).send("News item not found");
-        }
+    //     if (result.matchedCount === 0) {
+    //       return res.status(404).send("News item not found");
+    //     }
 
-        if (result.modifiedCount === 0) {
-          return res.status(400).send("No changes were made");
-        }
+    //     if (result.modifiedCount === 0) {
+    //       return res.status(400).send("No changes were made");
+    //     }
 
-        res.status(200).send("News item updated successfully");
-      } catch (error) {
-        console.error("Error updating news:", error);
-        res.status(500).send("Error updating news: " + error.message);
-      }
-    });
+    //     res.status(200).send("News item updated successfully");
+    //   } catch (error) {
+    //     console.error("Error updating news:", error);
+    //     res.status(500).send("Error updating news: " + error.message);
+    //   }
+    // });
 
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
