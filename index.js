@@ -388,26 +388,37 @@ app.patch('/news/edit-article/:id', async (req, res) => {
     });
 
     // Bookmark News (Normal User)
-    app.post("/bookmark", async (req, res) => {
-      const { email, newsId } = req.body;
-      const result = await usersCollection.updateOne(
-        { email },
-        { $addToSet: { bookmarks: newsId } }
-      );
-      res.send(result);
-    });
+app.post("/bookmark", async (req, res) => {
+  const { email, newsId } = req.body;
+  const result = await usersCollection.updateOne(
+    { email },
+    { $addToSet: { bookmarks: newsId } }
+  );
+  res.send(result);
+});
 
-    // Get Bookmarked News (Normal User)
-    app.get("/bookmarks/:email", async (req, res) => {
-      const email = req.params.email;
-      const user = await usersCollection.findOne({ email });
+// Remove Bookmark (Normal User)
+app.post("/remove-bookmark", async (req, res) => {
+  const { email, newsId } = req.body;
+  const result = await usersCollection.updateOne(
+    { email },
+    { $pull: { bookmarks: newsId } }
+  );
+  res.send(result);
+});
 
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+// Get Bookmarked News (Normal User)
+app.get("/bookmarks/:email", async (req, res) => {
+  const email = req.params.email;
+  const user = await usersCollection.findOne({ email });
 
-      res.send(user.bookmarks);
-    });
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  res.send(user.bookmarks);
+});
+
 
     // Find admin----------------------------
     app.get("/users/admin/:email", async (req, res) => {
