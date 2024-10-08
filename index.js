@@ -367,6 +367,26 @@ app.get("/bookmarks/:email", async (req, res) => {
 });
 
 
+    // get popular news
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+      console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await newsCollection.findOne(query);
+      res.send(result)
+    })
+
+    // get latest news
+    app.get('/newss/latestNews', async (req, res) => {
+      try {
+        const allNews = await newsCollection.find({}).sort({ timestamp: -1 }).limit(7).toArray();
+        res.send(allNews);
+      } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch latest news', error });
+      }
+    });
+
+
     // Find admin----------------------------
     app.get("/users/admin/:email", async (req, res) => {
       const email = req.params.email;
