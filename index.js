@@ -317,54 +317,54 @@ async function run() {
 
       res.status(400).json({ message: "Invalid action" });
     });
-// Bookmark News (Normal User)
-app.post("/bookmark", async (req, res) => {
-  const { email, newsId } = req.body;
+    // Bookmark News (Normal User)
+    app.post("/bookmark", async (req, res) => {
+      const { email, newsId } = req.body;
 
-  try {
-    const result = await usersCollection.updateOne(
-      { email },
-      { $addToSet: { bookmarks: newsId } }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).json({ message: "Error adding bookmark", error });
-  }
-});
+      try {
+        const result = await usersCollection.updateOne(
+          { email },
+          { $addToSet: { bookmarks: newsId } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: "Error adding bookmark", error });
+      }
+    });
 
-// Remove Bookmark (Normal User)
-app.post("/remove-bookmark", async (req, res) => {
-  const { email, newsId } = req.body;
+    // Remove Bookmark (Normal User)
+    app.post("/remove-bookmark", async (req, res) => {
+      const { email, newsId } = req.body;
 
-  try {
-    const result = await usersCollection.updateOne(
-      { email },
-      { $pull: { bookmarks: newsId } }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).json({ message: "Error removing bookmark", error });
-  }
-});
+      try {
+        const result = await usersCollection.updateOne(
+          { email },
+          { $pull: { bookmarks: newsId } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: "Error removing bookmark", error });
+      }
+    });
 
 
-// Get Bookmarked News by Email (Normal User)
-app.get("/bookmarks/:email", async (req, res) => {
-  const email = req.params.email;
+    // Get Bookmarked News by Email (Normal User)
+    app.get("/bookmarks/:email", async (req, res) => {
+      const email = req.params.email;
 
-  try {
-    const user = await usersCollection.findOne({ email });
+      try {
+        const user = await usersCollection.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
 
-    // Fetch the news details corresponding to the bookmarked newsIds if needed
-    res.send(user.bookmarks);
-  } catch (error) {
-    res.status(500).json({ message: "Error retrieving bookmarks", error });
-  }
-});
+        // Fetch the news details corresponding to the bookmarked newsIds if needed
+        res.send(user.bookmarks);
+      } catch (error) {
+        res.status(500).json({ message: "Error retrieving bookmarks", error });
+      }
+    });
 
 
     // get popular news
@@ -488,28 +488,28 @@ app.get("/bookmarks/:email", async (req, res) => {
     });
 
     // For news details page
-app.get("/news/:id", async (req, res) => {
-  const { id } = req.params;
+    app.get("/news/:id", async (req, res) => {
+      const { id } = req.params;
 
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).send({ message: "Invalid news ID" });
-  }
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid news ID" });
+      }
 
-  try {
-    const newsItem = await newsCollection.findOne({
-      _id: new ObjectId(id),
+      try {
+        const newsItem = await newsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (newsItem) {
+          res.json(newsItem);
+        } else {
+          res.status(404).send({ message: "News not found" });
+        }
+      } catch (error) {
+        console.error("Error fetching news:", error);
+        res.status(500).send({ message: "Internal Server Error", error });
+      }
     });
-
-    if (newsItem) {
-      res.json(newsItem);
-    } else {
-      res.status(404).send({ message: "News not found" });
-    }
-  } catch (error) {
-    console.error("Error fetching news:", error);
-    res.status(500).send({ message: "Internal Server Error", error });
-  }
-});
 
 
     // DASHBOARD  Fetch all news--------------
