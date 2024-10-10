@@ -293,11 +293,75 @@ async function run() {
     });
 
     // Get My Articles (Reporter)
-    app.get("/my-articles/:email", async (req, res) => {
+    app.get("/news/my-articles/:email", async (req, res) => {
       const email = req.params.email;
       const articles = await newsCollection.find({ author: email }).toArray();
       res.send(articles);
     });
+
+    // Delete an article by ID
+app.delete('/news/delete-article/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await newsCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    res.status(200).json({ message: 'Article deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting article' });
+  }
+});
+
+app.get('/news/get-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+
+  try {
+    const article = await newsCollection.findOne({ _id: new ObjectId(articleId) });
+
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json(article);
+  } catch (error) {
+    console.error('Error fetching article:', error);
+    res.status(500).json({ message: 'Error fetching article' });
+  }
+});
+
+app.patch('/news/edit-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+  const { title, description, image, category, region, breaking_news, popular_news, isLive } = req.body;
+
+  try {
+    // Find the article by ID and update it with new data
+    const result = await newsCollection.updateOne(
+      { _id: new ObjectId(articleId) },
+      {
+        $set: {
+          title,
+          description,
+          image,
+          category,
+          region,
+          breaking_news,
+          popular_news,
+          isLive,
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json({ message: 'Article updated successfully' });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ message: 'Error updating article' });
+  }
+});
 
     // Edit or Delete My Articles (Reporter)
     app.patch("/news/:id", async (req, res) => {
