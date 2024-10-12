@@ -366,6 +366,55 @@ app.get("/bookmarks/:email", async (req, res) => {
   }
 });
 
+// API route to add a favorite
+app.post("/favorites", async (req, res) => {
+  const { email, newsId } = req.body;
+
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $addToSet: { favorites: newsId } } // Add newsId to favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error adding favorite", error });
+  }
+});
+
+// API route to remove a favorite
+app.delete("/favorites", async (req, res) => {
+  const { email, newsId } = req.body;
+
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $pull: { favorites: newsId } } // Remove newsId from favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error removing favorite", error });
+  }
+});
+
+// API route to get user's favorites
+app.get("/favorites/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const user = await usersCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Fetch the news details corresponding to the favorite newsIds if needed
+    const favorites = user.favorites || [];
+    res.send(favorites);
+  } catch (error) {
+    res.status(500).json({ message: "Error retrieving favorites", error });
+  }
+});
+
 
     // get popular news
     app.get('/news/:id', async (req, res) => {
