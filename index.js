@@ -293,11 +293,75 @@ async function run() {
     });
 
     // Get My Articles (Reporter)
-    app.get("/my-articles/:email", async (req, res) => {
+    app.get("/news/my-articles/:email", async (req, res) => {
       const email = req.params.email;
       const articles = await newsCollection.find({ author: email }).toArray();
       res.send(articles);
     });
+
+    // Delete an article by ID
+app.delete('/news/delete-article/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await newsCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    res.status(200).json({ message: 'Article deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting article' });
+  }
+});
+
+app.get('/news/get-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+
+  try {
+    const article = await newsCollection.findOne({ _id: new ObjectId(articleId) });
+
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json(article);
+  } catch (error) {
+    console.error('Error fetching article:', error);
+    res.status(500).json({ message: 'Error fetching article' });
+  }
+});
+
+app.patch('/news/edit-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+  const { title, description, image, category, region, breaking_news, popular_news, isLive } = req.body;
+
+  try {
+    // Find the article by ID and update it with new data
+    const result = await newsCollection.updateOne(
+      { _id: new ObjectId(articleId) },
+      {
+        $set: {
+          title,
+          description,
+          image,
+          category,
+          region,
+          breaking_news,
+          popular_news,
+          isLive,
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json({ message: 'Article updated successfully' });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ message: 'Error updating article' });
+  }
+});
 
     // Edit or Delete My Articles (Reporter)
     app.patch("/news/:id", async (req, res) => {
@@ -317,54 +381,54 @@ async function run() {
 
       res.status(400).json({ message: "Invalid action" });
     });
-// Bookmark News (Normal User)
-app.post("/bookmark", async (req, res) => {
-  const { email, newsId } = req.body;
+    // Bookmark News (Normal User)
+    app.post("/bookmark", async (req, res) => {
+      const { email, newsId } = req.body;
 
-  try {
-    const result = await usersCollection.updateOne(
-      { email },
-      { $addToSet: { bookmarks: newsId } }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).json({ message: "Error adding bookmark", error });
-  }
-});
+      try {
+        const result = await usersCollection.updateOne(
+          { email },
+          { $addToSet: { bookmarks: newsId } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: "Error adding bookmark", error });
+      }
+    });
 
-// Remove Bookmark (Normal User)
-app.post("/remove-bookmark", async (req, res) => {
-  const { email, newsId } = req.body;
+    // Remove Bookmark (Normal User)
+    app.post("/remove-bookmark", async (req, res) => {
+      const { email, newsId } = req.body;
 
-  try {
-    const result = await usersCollection.updateOne(
-      { email },
-      { $pull: { bookmarks: newsId } }
-    );
-    res.send(result);
-  } catch (error) {
-    res.status(500).json({ message: "Error removing bookmark", error });
-  }
-});
+      try {
+        const result = await usersCollection.updateOne(
+          { email },
+          { $pull: { bookmarks: newsId } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: "Error removing bookmark", error });
+      }
+    });
 
 
-// Get Bookmarked News by Email (Normal User)
-app.get("/bookmarks/:email", async (req, res) => {
-  const email = req.params.email;
+    // Get Bookmarked News by Email (Normal User)
+    app.get("/bookmarks/:email", async (req, res) => {
+      const email = req.params.email;
 
-  try {
-    const user = await usersCollection.findOne({ email });
+      try {
+        const user = await usersCollection.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
 
-    // Fetch the news details corresponding to the bookmarked newsIds if needed
-    res.send(user.bookmarks);
-  } catch (error) {
-    res.status(500).json({ message: "Error retrieving bookmarks", error });
-  }
-});
+        // Fetch the news details corresponding to the bookmarked newsIds if needed
+        res.send(user.bookmarks);
+      } catch (error) {
+        res.status(500).json({ message: "Error retrieving bookmarks", error });
+      }
+    });
 
 // API route to add a favorite
 app.post("/favorites", async (req, res) => {
@@ -537,28 +601,28 @@ app.get("/favorites/:email", async (req, res) => {
     });
 
     // For news details page
-app.get("/news/:id", async (req, res) => {
-  const { id } = req.params;
+    app.get("/news/:id", async (req, res) => {
+      const { id } = req.params;
 
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).send({ message: "Invalid news ID" });
-  }
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid news ID" });
+      }
 
-  try {
-    const newsItem = await newsCollection.findOne({
-      _id: new ObjectId(id),
+      try {
+        const newsItem = await newsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (newsItem) {
+          res.json(newsItem);
+        } else {
+          res.status(404).send({ message: "News not found" });
+        }
+      } catch (error) {
+        console.error("Error fetching news:", error);
+        res.status(500).send({ message: "Internal Server Error", error });
+      }
     });
-
-    if (newsItem) {
-      res.json(newsItem);
-    } else {
-      res.status(404).send({ message: "News not found" });
-    }
-  } catch (error) {
-    console.error("Error fetching news:", error);
-    res.status(500).send({ message: "Internal Server Error", error });
-  }
-});
 
 
     // DASHBOARD  Fetch all news--------------
