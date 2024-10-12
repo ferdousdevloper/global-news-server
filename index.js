@@ -397,38 +397,40 @@ app.patch('/news/edit-article/:articleId', async (req, res) => {
     });
 
     // Remove Bookmark (Normal User)
-    app.post("/remove-bookmark", async (req, res) => {
-      const { email, newsId } = req.body;
+   // API route to remove a favorite
+app.delete("/bookmarks", async (req, res) => {
+  const { email, newsId } = req.body;
 
-      try {
-        const result = await usersCollection.updateOne(
-          { email },
-          { $pull: { bookmarks: newsId } }
-        );
-        res.send(result);
-      } catch (error) {
-        res.status(500).json({ message: "Error removing bookmark", error });
-      }
-    });
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $pull: { bookmarks: newsId } } // Remove newsId from favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error removing bookmark", error });
+  }
+});
 
+   // API route to get user's favorites
+app.get("/bookmarks/:email", async (req, res) => {
+  const email = req.params.email;
 
-    // Get Bookmarked News by Email (Normal User)
-    app.get("/bookmarks/:email", async (req, res) => {
-      const email = req.params.email;
+  try {
+    const user = await usersCollection.findOne({ email });
 
-      try {
-        const user = await usersCollection.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
-
-        // Fetch the news details corresponding to the bookmarked newsIds if needed
-        res.send(user.bookmarks);
-      } catch (error) {
-        res.status(500).json({ message: "Error retrieving bookmarks", error });
-      }
-    });
+    // Fetch the news details corresponding to the favorite newsIds if needed
+    const bookmarks = user.bookmarks || [];
+    res.send(bookmarks);
+  } catch (error) {
+    res.status(500).json({ message: "Error retrieving bookmarks", error });
+  }
+});
+    
 
 // API route to add a favorite
 app.post("/favorites", async (req, res) => {
