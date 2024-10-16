@@ -387,6 +387,39 @@ async function run() {
     });
 
 
+    // get news according to region , category , title..
+    app.get('/newss/filter', async (req, res) => {
+      const { region, category, topic } = req.query;
+
+      let query = {};
+
+      if (region) {
+        query.region = region;
+      }
+
+      if (category) {
+        query.category = category;
+      }
+
+      if (topic) {
+        query.title = topic; 
+      }
+
+      try {
+        const filteredNews = await newsCollection.find(query).toArray();
+
+        if (filteredNews.length > 0) {
+          return res.send(filteredNews);
+        } else {
+          return res.status(404).send({ message: 'Nothing found...' });
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        return res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+
+
     // Find admin----------------------------
     app.get("/users/admin/:email", async (req, res) => {
       const email = req.params.email;
