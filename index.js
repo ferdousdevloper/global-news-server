@@ -293,11 +293,75 @@ async function run() {
     });
 
     // Get My Articles (Reporter)
-    app.get("/my-articles/:email", async (req, res) => {
+    app.get("/news/my-articles/:email", async (req, res) => {
       const email = req.params.email;
       const articles = await newsCollection.find({ author: email }).toArray();
       res.send(articles);
     });
+
+    // Delete an article by ID
+app.delete('/news/delete-article/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await newsCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    res.status(200).json({ message: 'Article deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error deleting article' });
+  }
+});
+
+app.get('/news/get-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+
+  try {
+    const article = await newsCollection.findOne({ _id: new ObjectId(articleId) });
+
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json(article);
+  } catch (error) {
+    console.error('Error fetching article:', error);
+    res.status(500).json({ message: 'Error fetching article' });
+  }
+});
+
+app.patch('/news/edit-article/:articleId', async (req, res) => {
+  const { articleId } = req.params;
+  const { title, description, image, category, region, breaking_news, popular_news, isLive } = req.body;
+
+  try {
+    // Find the article by ID and update it with new data
+    const result = await newsCollection.updateOne(
+      { _id: new ObjectId(articleId) },
+      {
+        $set: {
+          title,
+          description,
+          image,
+          category,
+          region,
+          breaking_news,
+          popular_news,
+          isLive,
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Article not found' });
+    }
+
+    res.json({ message: 'Article updated successfully' });
+  } catch (error) {
+    console.error('Error updating article:', error);
+    res.status(500).json({ message: 'Error updating article' });
+  }
+});
 
     // Edit or Delete My Articles (Reporter)
     app.patch("/news/:id", async (req, res) => {
@@ -317,28 +381,159 @@ async function run() {
 
       res.status(400).json({ message: "Invalid action" });
     });
-
     // Bookmark News (Normal User)
     app.post("/bookmark", async (req, res) => {
       const { email, newsId } = req.body;
-      const result = await usersCollection.updateOne(
-        { email },
-        { $addToSet: { bookmarks: newsId } }
-      );
-      res.send(result);
+
+      try {
+        const result = await usersCollection.updateOne(
+          { email },
+          { $addToSet: { bookmarks: newsId } }
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).json({ message: "Error adding bookmark", error });
+      }
     });
 
-    // Get Bookmarked News (Normal User)
-    app.get("/bookmarks/:email", async (req, res) => {
-      const email = req.params.email;
-      const user = await usersCollection.findOne({ email });
+    // Remove Bookmark (Normal User)
+   // API route to remove a favorite
+app.delete("/bookmarks", async (req, res) => {
+  const { email, newsId } = req.body;
 
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $pull: { bookmarks: newsId } } // Remove newsId from favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error removing bookmark", error });
+  }
+});
+
+   // API route to get user's favorites
+app.get("/bookmarks/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const user = await usersCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Fetch the news details corresponding to the favorite newsIds if needed
+    const bookmarks = user.bookmarks || [];
+    res.send(bookmarks);
+  } catch (error) {
+    res.status(500).json({ message: "Error retrieving bookmarks", error });
+  }
+});
+    
+
+// API route to add a favorite
+app.post("/favorites", async (req, res) => {
+  const { email, newsId } = req.body;
+
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $addToSet: { favorites: newsId } } // Add newsId to favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error adding favorite", error });
+  }
+});
+
+// API route to remove a favorite
+app.delete("/favorites", async (req, res) => {
+  const { email, newsId } = req.body;
+
+  try {
+    const result = await usersCollection.updateOne(
+      { email },
+      { $pull: { favorites: newsId } } // Remove newsId from favorites array
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error removing favorite", error });
+  }
+});
+
+// API route to get user's favorites
+app.get("/favorites/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const user = await usersCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Fetch the news details corresponding to the favorite newsIds if needed
+    const favorites = user.favorites || [];
+    res.send(favorites);
+  } catch (error) {
+    res.status(500).json({ message: "Error retrieving favorites", error });
+  }
+});
+
+
+    // get popular news
+    app.get('/news/:id', async (req, res) => {
+      const { id } = req.params;
+      console.log(id)
+      const query = { _id: new ObjectId(id) }
+      const result = await newsCollection.findOne(query);
+      res.send(result)
+    })
+
+    // get latest news
+    app.get('/newss/latestNews', async (req, res) => {
+      try {
+        const allNews = await newsCollection.find({}).sort({ timestamp: -1 }).limit(7).toArray();
+        res.send(allNews);
+      } catch (error) {
+        res.status(500).send({ message: 'Failed to fetch latest news', error });
+      }
+    });
+
+
+    // get news according to region , category , title..
+    app.get('/newss/filter', async (req, res) => {
+      const { region, category, topic } = req.query;
+
+      let query = {};
+
+      if (region) {
+        query.region = region;
       }
 
-      res.send(user.bookmarks);
+      if (category) {
+        query.category = category;
+      }
+
+      if (topic) {
+        query.title = topic; 
+      }
+
+      try {
+        const filteredNews = await newsCollection.find(query).toArray();
+
+        if (filteredNews.length > 0) {
+          return res.send(filteredNews);
+        } else {
+          return res.status(404).send({ message: 'Nothing found...' });
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        return res.status(500).send({ message: 'Internal server error' });
+      }
     });
+
 
     // Find admin----------------------------
     app.get("/users/admin/:email", async (req, res) => {
@@ -440,17 +635,15 @@ async function run() {
       res.send(result);
     });
 
-    // for news details page-------
+    // For news details page
     app.get("/news/:id", async (req, res) => {
       const { id } = req.params;
 
-      // Check if id is a valid MongoDB ObjectId
       if (!ObjectId.isValid(id)) {
         return res.status(400).send({ message: "Invalid news ID" });
       }
 
       try {
-        // Convert the id to an ObjectId
         const newsItem = await newsCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -465,6 +658,7 @@ async function run() {
         res.status(500).send({ message: "Internal Server Error", error });
       }
     });
+
 
     // DASHBOARD  Fetch all news--------------
     app.get("/news", async (req, res) => {
