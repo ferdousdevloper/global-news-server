@@ -579,19 +579,49 @@ app.get("/favorites/:email", async (req, res) => {
       }
     });
 
-    // Make normal user to admin for admin dashboard----------------
+    // // Make normal user to admin for admin dashboard----------------
 
-    app.patch("/users/admin/:id", async (req, res) => {
+    // app.patch("/users/admin/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const filter = { _id: new ObjectId(id) };
+    //   const updatedDoc = {
+    //     $set: {
+    //       role: "admin",
+    //     },
+    //   };
+    //   const result = await usersCollection.updateOne(filter, updatedDoc);
+    //   res.send(result);
+    // });
+
+    app.patch("/users/role/:id", async (req, res) => {
       const id = req.params.id;
+      const { role } = req.body; // Role comes from the request body (admin, reporter, normal user)
+    
+      // Validate role
+      const validRoles = ["admin", "reporter", "normal user"];
+      if (!validRoles.includes(role)) {
+        return res.status(400).send({ message: "Invalid role" });
+      }
+    
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
-          role: "admin",
+          role: role, // Set the role dynamically based on the request
         },
       };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
+    
+      try {
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        if (result.modifiedCount > 0) {
+          res.send({ message: `User role updated to ${role}`, result });
+        } else {
+          res.status(404).send({ message: "User not found or role already set" });
+        }
+      } catch (error) {
+        res.status(500).send({ message: "An error occurred", error });
+      }
     });
+    
 
     // delete user for admin dashboard----------------
     app.delete("/users/:id", async (req, res) => {
@@ -633,6 +663,18 @@ app.get("/favorites/:email", async (req, res) => {
       };
       const result = await usersCollection.updateOne(filter, updatedDoc);
       res.send(result);
+    });
+
+    // Find block----------------------------
+    app.get("/users/block/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let block = false;
+      if (user) {
+        block = user?.status === "block";
+      }
+      res.send({ block });
     });
 
     // For news details page
